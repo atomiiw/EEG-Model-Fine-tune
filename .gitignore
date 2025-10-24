@@ -1,0 +1,29 @@
+# Ignore data and results (both root and inside MIRepNet)
+data/
+result/
+results/
+output/
+outputs/
+
+MIRepNet/data/
+MIRepNet/result/
+MIRepNet/results/
+MIRepNet/output/
+MIRepNet/outputs/
+
+# Checkpoints / weights
+*.pth
+*.pt
+
+# Python junk
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.ipynb_checkpoints
+
+# IDE / system files
+.vscode/
+.idea/
+.DS_Store
+preprocess data/
