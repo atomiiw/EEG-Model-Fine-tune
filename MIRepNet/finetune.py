@@ -9,7 +9,7 @@ def parse_args():
     # Experiment configuration
     parser.add_argument('--dataset_name', default='BNCI2014004', help='EEG dataset name')
     parser.add_argument('--model_name', default='MIRepNet', help='Model identifier')
-
+    
     # Training hyperparameters
     parser.add_argument('--batch_size', type=int, default=8, help='Batch size for training')
     parser.add_argument('--epochs', type=int, default=10, help='Number of training epochs')
@@ -17,86 +17,61 @@ def parse_args():
     parser.add_argument('--weight_decay', type=float, default=1e-6, help='Weight decay')
     
     # Optimizer selection
-    parser.add_argument('--optimizer', choices=['adam', 'sgd'], default='adam', 
-                       help='Optimizer to use (adam or sgd)')
-    parser.add_argument('--momentum', type=float, default=0.9, 
-                       help='Momentum for SGD optimizer')
+    parser.add_argument('--optimizer', choices=['adam', 'sgd'], default='adam', help='Optimizer to use')
+    parser.add_argument('--momentum', type=float, default=0.9, help='Momentum for SGD optimizer')
     
     # Scheduler configuration
-    parser.add_argument('--scheduler', choices=['cosine', 'step', 'none'], 
-                       default='cosine', help='Learning rate scheduler')
-    parser.add_argument('--step_size', type=int, default=30, 
-                       help='Step size for step LR scheduler')
-    parser.add_argument('--gamma', type=float, default=0.1, 
-                       help='Gamma for step LR scheduler')
+    parser.add_argument('--scheduler', choices=['cosine', 'step', 'none'], default='cosine', help='LR scheduler type')
+    parser.add_argument('--step_size', type=int, default=30, help='Step size for step LR scheduler')
+    parser.add_argument('--gamma', type=float, default=0.1, help='Gamma for step LR scheduler')
     
     # Model architecture
-    parser.add_argument('--emb_size', type=int, default=256, 
-                       help='Embedding size for the model')
-    parser.add_argument('--depth', type=int, default=6, 
-                       help='Number of transformer layers')
-    parser.add_argument('--num_classes', type=int, default=2, 
-                       help='Number of output classes')
+    parser.add_argument('--emb_size', type=int, default=256, help='Embedding size')
+    parser.add_argument('--depth', type=int, default=6, help='Number of transformer layers')
+    parser.add_argument('--num_classes', type=int, default=2, help='Number of output classes')
     
     # Data loading
-    parser.add_argument('--num_workers', type=int, default=4, 
-                       help='Number of workers for data loading')
-    parser.add_argument('--val_split', type=float, default=0.7, 
-                       help='Validation set split ratio')
+    parser.add_argument('--num_workers', type=int, default=4, help='Number of workers for data loading')
+    parser.add_argument('--val_split', type=float, default=0.1, help='Validation set split ratio')
     
     # Experiment repetition
-    parser.add_argument('--num_exp', type=int, default=1, 
-                       help='Number of experiment repetitions')
+    parser.add_argument('--num_exp', type=int, default=1, help='Number of experiment repetitions')
     
     # Pretrained weights
-    parser.add_argument('--pretrain_path', default='./weight/MIRepNet.pth', 
-                       help='Path to pretrained model weights')
+    parser.add_argument('--pretrain_path', default='./weight/MIRepNet.pth', help='Path to pretrained model weights')
+
+    # ✅ Pre-split dataset flags
+    parser.add_argument('--use_presplit', action='store_true', help='Use pre-split train/val npy files')
+    parser.add_argument('--train_X_path', type=str, default=None, help='Path to training data (X)')
+    parser.add_argument('--train_y_path', type=str, default=None, help='Path to training labels (y)')
+    parser.add_argument('--val_X_path', type=str, default=None, help='Path to validation data (X)')
+    parser.add_argument('--val_y_path', type=str, default=None, help='Path to validation labels (y)')
     
     return parser.parse_args()
+
 
 if __name__ == '__main__':
     print("Starting EEG Classification with Configurable Hyperparameters\n")
     args = parse_args()
     
-    # Initialize empty channel names list
     args.datasetchnname = []  
-    args.sub_num = 0  # Will be set in run_experiment
-    
+    args.sub_num = 0  
+
+    # Detect pre-split usage
+    if args.use_presplit:
+        print(f"📂 Using pre-split datasets:\n"
+              f"   train_X: {args.train_X_path}\n"
+              f"   train_y: {args.train_y_path}\n"
+              f"   val_X:   {args.val_X_path}\n"
+              f"   val_y:   {args.val_y_path}\n")
+
     # Initialize logging
-    # experiment_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    # log_file = open(
-    #     f"./result/log/{args.dataset_name}_{args.model_name}_{experiment_time}_log.txt", 
-    #     'w'
-    # )
-
-    ### Atom added: initialize the log folder and the log.txt file is not yet exist
-
-    # ✅ Initialize logging safely
-    import os
-
-    # Ensure folder exists
-    log_dir = "./result/log"
-    os.makedirs(log_dir, exist_ok=True)
-
-    # Create timestamped log file path
     experiment_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    log_path = os.path.join(
-        log_dir, f"{args.dataset_name}_{args.model_name}_{experiment_time}_log.txt"
-    )
-
-    # Create and initialize the file if it doesn't exist
-    if not os.path.exists(log_path):
-        with open(log_path, 'w') as f:
-            f.write("=== New Experiment Log ===\n")
-
-    # Open file handle for later writing
-    log_file = open(log_path, 'a')
-
-    ### done adding ###
-
+    log_file = open(f"./result/log/{args.dataset_name}_{args.model_name}_{experiment_time}_log.txt", 'w')
+    
     try:
         run_experiment(args, log_file)
     finally:
         log_file.close()
     
-    print("Experiment completed successfully")
+    print("✅ Experiment completed successfully")

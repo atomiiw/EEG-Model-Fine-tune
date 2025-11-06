@@ -30,11 +30,10 @@ def set_seed(seed):
 def pad_missing_channels_diff(x, target_channels, actual_channels):
     B, C, T = x.shape
     num_target = len(target_channels)
-    
-    existing_pos = np.array([channel_positions[ch] for ch in actual_channels])
 
+    existing_pos = np.array([channel_positions[ch] for ch in actual_channels])
     target_pos = np.array([channel_positions[ch] for ch in target_channels])
-    
+
     W = np.zeros((num_target, C))
     for i, (target_ch, pos) in enumerate(zip(target_channels, target_pos)):
         if target_ch in actual_channels:
@@ -42,14 +41,14 @@ def pad_missing_channels_diff(x, target_channels, actual_channels):
             W[i, src_idx] = 1.0
         else:
             dist = cdist([pos], existing_pos)[0]
-            weights = 1 / (dist + 1e-6)  
-            weights /= weights.sum()     
+            weights = 1 / (dist + 1e-6)
+            weights /= weights.sum()
             W[i] = weights
-    
+
     padded = np.zeros((B, num_target, T))
     for b in range(B):
-        padded[b] = W @ x[b]  
-    
+        padded[b] = W @ x[b]
+
     return padded
 
 
@@ -74,7 +73,7 @@ def EA(x, return_matrix=False):
 
 def process_and_replace_loader(loader, ischangechn, dataset, return_ea=False):
     print("🔧 Using local process_and_replace_loader from finetune.py")
-    
+
     all_data, all_labels = [], []
     for i in range(len(loader.dataset)):
         data, label = loader.dataset[i]
@@ -127,7 +126,7 @@ def train(model, train_loader, criterion, optimizer, device, scheduler):
     running_loss = 0.0
     correct = 0
     total = 0
-    
+
     for data, labels in train_loader:
         data, labels = data.to(device), labels.to(device)
 
@@ -142,15 +141,16 @@ def train(model, train_loader, criterion, optimizer, device, scheduler):
         _, predicted = torch.max(outputs, 1)
         total += labels.size(0)
         correct += (predicted == labels).sum().item()
-    
+
     scheduler.step()
 
     current_lr = optimizer.param_groups[0]['lr']
 
     epoch_loss = running_loss / len(train_loader)
     accuracy = correct / total * 100
-    
+
     return epoch_loss, accuracy, current_lr
+
 
 def validate(model, val_loader, criterion, device):
     model.eval()
@@ -158,7 +158,7 @@ def validate(model, val_loader, criterion, device):
     correct = 0
     total = 0
 
-    ### Added ### 
+    ### Added ###
     all_preds = []
     all_labels = []
     #############
@@ -168,13 +168,13 @@ def validate(model, val_loader, criterion, device):
             data, labels = data.to(device), labels.to(device)
             _, outputs = model(data)
             loss = criterion(outputs, labels)
-            
+
             running_loss += loss.item()
             _, predicted = torch.max(outputs, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
-            ### Added ### 
+            ### Added ###
             all_preds.append(predicted.cpu().numpy())
             all_labels.append(labels.cpu().numpy())
             #############
@@ -182,7 +182,7 @@ def validate(model, val_loader, criterion, device):
     epoch_loss = running_loss / len(val_loader)
     accuracy = correct / total * 100
 
-    ### Added ### 
+    ### Added ###
 
     # Concatenate results for the full val set
     all_preds = np.concatenate(all_preds)
@@ -190,7 +190,7 @@ def validate(model, val_loader, criterion, device):
 
     # ✅ Print first few predictions vs labels for inspection
     print("Predicted:", all_preds[:32])
-    print("Actual:   ", all_labels[:32])
+    print("Actual: ", all_labels[:32])
 
     # Report accuracies
     print(f"Got {correct} out of {total} correct. Accuracy: {accuracy}.")
@@ -198,6 +198,7 @@ def validate(model, val_loader, criterion, device):
     #############
 
     return epoch_loss, accuracy
+
 
 def run_experiment(args, log_file):
     """Run complete experiment pipeline with configurable hyperparameters"""
@@ -211,7 +212,7 @@ def run_experiment(args, log_file):
     os.makedirs(os.path.dirname(log_filename), exist_ok=True)
     os.makedirs(os.path.dirname(csv_filename), exist_ok=True)
     file_handler = open(log_filename, 'w')
-    
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     results = []
 
@@ -224,9 +225,9 @@ def run_experiment(args, log_file):
         'AlexMI': 8
     }
     args.sub_num = dataset_subjects.get(args.dataset_name, 0)
-    if args.sub_num == 0:  # custom dataset fallback
+    if args.sub_num == 0: # custom dataset fallback
         args.sub_num = 1
-    
+
     # Seed iteration
     for seed_offset in range(args.num_exp):
         seed = seed_offset + 666
@@ -242,31 +243,52 @@ def run_experiment(args, log_file):
             subject_results[subject] = val_acc
 
         results.append([seed] + list(subject_results.values()))
-    
+
     save_results(results, args.sub_num, csv_filename)
     file_handler.close()
 
+
 def train_subject(args, subject, seed, device, log_file):
     """Train and validate model for single subject with configurable hyperparams"""
-    # Prepare dataset
     args.sub = [subject]
-    dataset = EEGDataset(args=args)
-    train_data, val_data = train_test_split(dataset, test_size=args.val_split, random_state=seed)
-    
+
+    # ✅ Pre-split mode: use provided train/val files
+    if getattr(args, "use_presplit", False):
+        log_message = (
+            f"📂 Using pre-split training and validation files:\n"
+            f"   Train X: {args.train_X_path}\n"
+            f"   Train y: {args.train_y_path}\n"
+            f"   Val X:   {args.val_X_path}\n"
+            f"   Val y:   {args.val_y_path}\n"
+        )
+        print(log_message)
+        log_file.write(log_message)
+
+        train_data = EEGDataset(X_path=args.train_X_path, y_path=args.train_y_path)
+        val_data = EEGDataset(X_path=args.val_X_path, y_path=args.val_y_path)
+    else:
+        # Standard mode: load full dataset and split
+        log_message = f"📊 Loading full dataset and splitting with val_split={args.val_split}\n"
+        print(log_message)
+        log_file.write(log_message)
+
+        dataset = EEGDataset(args=args)
+        train_data, val_data = train_test_split(dataset, test_size=args.val_split, random_state=seed)
+
     # Configure data loaders
     train_loader = DataLoader(
-        train_data, 
-        batch_size=args.batch_size, 
-        shuffle=True, 
+        train_data,
+        batch_size=args.batch_size,
+        shuffle=True,
         num_workers=args.num_workers
     )
     val_loader = DataLoader(
-        val_data, 
-        batch_size=args.batch_size, 
-        shuffle=False, 
+        val_data,
+        batch_size=args.batch_size,
+        shuffle=False,
         num_workers=args.num_workers
     )
-    
+
     # Preprocess data
     train_loader, ea_matrix = process_and_replace_loader(
         train_loader,
@@ -285,7 +307,7 @@ def train_subject(args, subject, seed, device, log_file):
         ea_save_path = f"./weight/{args.dataset_name}_EA_matrix.npy"
         np.save(ea_save_path, ea_matrix)
         print(f"✅ Saved EA matrix to {ea_save_path}")
-        
+
     # Initialize model
     model = mlm_mask(
         emb_size=args.emb_size,
@@ -294,27 +316,27 @@ def train_subject(args, subject, seed, device, log_file):
         pretrainmode=False,
         pretrain=args.pretrain_path
     ).to(device)
-    
+
     # Set up training components
     criterion = nn.CrossEntropyLoss()
-    
+
     if args.optimizer == 'adam':
         optimizer = optim.Adam(
-            model.parameters(), 
-            lr=args.lr, 
+            model.parameters(),
+            lr=args.lr,
             weight_decay=args.weight_decay
         )
     elif args.optimizer == 'sgd':
         optimizer = optim.SGD(
-            model.parameters(), 
-            lr=args.lr, 
+            model.parameters(),
+            lr=args.lr,
             momentum=args.momentum,
             weight_decay=args.weight_decay
         )
-    
+
     if args.scheduler == 'cosine':
         scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, 
+            optimizer,
             T_max=args.epochs
         )
     elif args.scheduler == 'step':
@@ -325,23 +347,23 @@ def train_subject(args, subject, seed, device, log_file):
         )
     else:
         scheduler = None
-    
+
     final_val_acc = 0.0
     print(f"Seed: {seed}, Subject: {subject}\n")
     # Training loop
     for epoch in range(args.epochs):
         # Training phase
         train_loss, train_acc, curr_lr = train(
-            model, train_loader, criterion, 
+            model, train_loader, criterion,
             optimizer, device, scheduler
         )
-        
+
         # Validation phase
         val_loss, val_acc = validate(
             model, val_loader, criterion, device
         )
         final_val_acc = val_acc
-        
+
         # Log epoch results
         log_file.write(
             f"Seed: {seed}, Subject: {subject}, Epoch: {epoch+1}\n"
@@ -349,31 +371,32 @@ def train_subject(args, subject, seed, device, log_file):
             f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}, "
             f"LR: {curr_lr:.6f}\n"
         )
-    
-    ### Added ###
 
-    # Save the fine-tuned model weights for later inference
-    torch.save(model.state_dict(), f"./weight/{args.dataset_name}_{args.model_name}_finetuned.pth")
-    print(f"Saved fine-tuned weights to ./weight/{args.dataset_name}_{args.model_name}_finetuned.pth")
+        ### Added ###
 
-    #############
-    
+        # Save the fine-tuned model weights for later inference
+        torch.save(model.state_dict(), f"./weight/{args.dataset_name}_{args.model_name}_finetuned.pth")
+        print(f"💾 Saved fine-tuned weights to ./weight/{args.dataset_name}_{args.model_name}_finetuned.pth")
+
+        #############
+
     return final_val_acc
+
 
 def save_results(results, subject_count, filename):
     """Save experiment results to CSV file"""
     columns = ["Seed"] + [f"Subject_{i}_Acc" for i in range(subject_count)]
     results_df = pd.DataFrame(results, columns=columns)
-    
+
     # Calculate summary statistics
     results_df['Seed_Avg_Acc'] = results_df.iloc[:, 1:].mean(axis=1)
     subject_avg = results_df.iloc[:, 1:-1].mean(axis=0)
     seed_avg = results_df['Seed_Avg_Acc'].mean()
-    
+
     # Add summary row
     summary_row = ['Average'] + subject_avg.tolist() + [seed_avg]
     results_df.loc[len(results_df)] = summary_row
-    
+
     # Save to CSV
     results_df.to_csv(filename, index=False)
     print(f"Results saved to {filename}")
