@@ -9,18 +9,23 @@ from scipy.spatial.distance import cdist
 import pandas as pd
 from collections import Counter
 from utils.channel_list import *
+import os
 
 class EEGDataset(Dataset):
     def __init__(self, args=None):
         self.dataset_name = args.dataset_name
         self.args = args
-
+        
         if self.dataset_name == 'BNCI2014001-4':
-            X = np.load('/data/' + 'BNCI2014001' + '/X.npy')
-            y = np.load('/data/' + 'BNCI2014001' + '/labels.npy')
+            base_path = os.path.join(os.path.dirname(__file__), 'data', 'BNCI2014001')
+            X = np.load(os.path.join(base_path, 'X.npy'))
+            y = np.load(os.path.join(base_path, 'labels.npy'))
         else:
-            X = np.load('/data/' + self.dataset_name + '/X.npy')
-            y = np.load('/data/' + self.dataset_name + '/labels.npy')
+            base_path = os.path.join(os.path.dirname(__file__), 'data', self.dataset_name)
+            X = np.load(os.path.join(base_path, 'X.npy'))
+            y = np.load(os.path.join(base_path, 'labels.npy'))
+
+                
         print("original data shape:", X.shape, "labels shape:", y.shape)
         if self.dataset_name == 'BNCI2014004':
             self.paradigm = 'MI'
