@@ -9,7 +9,7 @@ def parse_args():
     # Experiment configuration
     parser.add_argument('--dataset_name', default='BNCI2014004', help='EEG dataset name')
     parser.add_argument('--model_name', default='MIRepNet', help='Model identifier')
-    
+
     # Training hyperparameters
     parser.add_argument('--batch_size', type=int, default=8, help='Batch size for training')
     parser.add_argument('--epochs', type=int, default=10, help='Number of training epochs')
@@ -63,12 +63,37 @@ if __name__ == '__main__':
     args.sub_num = 0  # Will be set in run_experiment
     
     # Initialize logging
+    # experiment_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    # log_file = open(
+    #     f"./result/log/{args.dataset_name}_{args.model_name}_{experiment_time}_log.txt", 
+    #     'w'
+    # )
+
+    ### Atom added: initialize the log folder and the log.txt file is not yet exist
+
+    # ✅ Initialize logging safely
+    import os
+
+    # Ensure folder exists
+    log_dir = "./result/log"
+    os.makedirs(log_dir, exist_ok=True)
+
+    # Create timestamped log file path
     experiment_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    log_file = open(
-        f"./result/log/{args.dataset_name}_{args.model_name}_{experiment_time}_log.txt", 
-        'w'
+    log_path = os.path.join(
+        log_dir, f"{args.dataset_name}_{args.model_name}_{experiment_time}_log.txt"
     )
-    
+
+    # Create and initialize the file if it doesn't exist
+    if not os.path.exists(log_path):
+        with open(log_path, 'w') as f:
+            f.write("=== New Experiment Log ===\n")
+
+    # Open file handle for later writing
+    log_file = open(log_path, 'a')
+
+    ### done adding ###
+
     try:
         run_experiment(args, log_file)
     finally:
