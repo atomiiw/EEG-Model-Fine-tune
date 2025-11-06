@@ -16,11 +16,11 @@ class EEGDataset(Dataset):
         self.args = args
 
         if self.dataset_name == 'BNCI2014001-4':
-            X = np.load('./data/' + 'BNCI2014001' + '/X.npy')
-            y = np.load('./data/' + 'BNCI2014001' + '/labels.npy')
+            X = np.load('/data/' + 'BNCI2014001' + '/X.npy')
+            y = np.load('/data/' + 'BNCI2014001' + '/labels.npy')
         else:
-            X = np.load('./data/' + self.dataset_name + '/X.npy')
-            y = np.load('./data/' + self.dataset_name + '/labels.npy')
+            X = np.load('/data/' + self.dataset_name + '/X.npy')
+            y = np.load('/data/' + self.dataset_name + '/labels.npy')
         print("original data shape:", X.shape, "labels shape:", y.shape)
         if self.dataset_name == 'BNCI2014004':
             self.paradigm = 'MI'
